@@ -4,13 +4,14 @@
 # Below is what will be displayed in Domoticz GUI under HW
 #
 """
-<plugin key="VictronGXModBus" name="VictronGX Modbus over TCP/IP" author="pawcio" version="1.0.1" wikilink="no" >
+<plugin key="VictronGXModBus" name="VictronGX Modbus over TCP/IP" author="pawcio" version="2.0.0" wikilink="no" >
     <params>
         <param field="Address" label="IP Address" width="200px" required="true" default="192.168.1.73"/>
         <param field="Port" label="Port" width="40px" required="true" default="502"/>
         <param field="Mode3" label="GX Device Unit-id" width="250px" default="100"/> 
         <param field="Mode4" label="Multiplus Device Unit-id" width="250px" default="228"/> 
-        <param field="Mode5" label="Solar Charger Unit-id" width="250px" default="229"/> 
+        <param field="Mode5" label="First Solar Charger Unit-id" width="250px" default=""/>  #229
+        <param field="Mode1" label="Second Solar Charger Unit-id" width="250px" default=""/> #238
         <param field="Mode6" label="Debug" width="75px">
             <options>
                 <option label="True" value="Debug"/>
@@ -33,6 +34,9 @@ class BasePlugin:
     registers = [] 
     idx = 0;
     
+    firstSolarCharger = False
+    secondSolarCharger = False
+    
     power = "0;0"
 
     # Domoticz call back functions
@@ -40,11 +44,18 @@ class BasePlugin:
             
     # Executed once at HW creation/ update. Can create up to 255 devices.
     def onStart(self):
+        self.firstSolarCharger = len(Parameters["Mode5"])!=0
+        self.secondSolarCharger = len(Parameters["Mode1"])!=0
+        
         self.registers = [ int(Parameters["Mode4"]).to_bytes(1, byteorder='big') + b'\x03\x00\x03\x00\x3d', 
             int(Parameters["Mode3"]).to_bytes(1, byteorder='big') + b'\x03\x03\x26\x00\x15', 
-            int(Parameters["Mode3"]).to_bytes(1, byteorder='big') + b'\x03\x03\x48\x00\x06',
-            int("229").to_bytes(1, byteorder='big') + b'\x03\x03\x03\x00\x15',
-            int("238").to_bytes(1, byteorder='big') + b'\x03\x03\x03\x00\x15']
+            int(Parameters["Mode3"]).to_bytes(1, byteorder='big') + b'\x03\x03\x48\x00\x06']
+            
+        if True == self.firstSolarCharger:
+            self.registers.append(int(Parameters["Mode5"]).to_bytes(1, byteorder='big') + b'\x03\x03\x03\x00\x15')
+            
+        if True == self.secondSolarCharger:
+            self.registers.append(int(Parameters["Mode1"]).to_bytes(1, byteorder='big') + b'\x03\x03\x03\x00\x15')
 
         Domoticz.Log(str(self.registers))
         if Parameters["Mode6"] == "Debug":
@@ -65,14 +76,16 @@ class BasePlugin:
         self.UNIT_BATTSTATE = 10
         self.UNIT_BATTTEMP = 11
         self.UNIT_BATTW = 12
-        self.UNIT_PVW = 13
-        self.UNIT_PVALLPOW = 14
-        self.UNIT_PVV = 15
-        self.UNIT_PVA = 16
-        self.UNIT_PVW_250 = 17
-        self.UNIT_PVALLPOW_250 = 18
-        self.UNIT_PVV_250 = 19
-        self.UNIT_PVA_250 = 20
+        if True == self.firstSolarCharger:
+            self.UNIT_PVW = 13
+            self.UNIT_PVALLPOW = 14
+            self.UNIT_PVV = 15
+            self.UNIT_PVA = 16
+        if True == self.secondSolarCharger:
+            self.UNIT_PVW_250 = 17
+            self.UNIT_PVALLPOW_250 = 18
+            self.UNIT_PVV_250 = 19
+            self.UNIT_PVA_250 = 20
         self.UNIT_ACINVL2 = 21
         self.UNIT_ACINAL2 = 22
         self.UNIT_ACINWL2 = 23
@@ -100,12 +113,14 @@ class BasePlugin:
             Domoticz.Device(Name="battState", Unit=self.UNIT_BATTSTATE, TypeName="Alert").Create()
             Domoticz.Device(Name="battTemp", Unit=self.UNIT_BATTTEMP, TypeName="Temperature").Create()
             Domoticz.Device(Name="battW", Unit=self.UNIT_BATTW, Type=248, Subtype=1).Create()
-            Domoticz.Device(Name="PVW", Unit=self.UNIT_PVW, Type=248, Subtype=1).Create()
-            Domoticz.Device(Name="PVV", Unit=self.UNIT_PVV, TypeName="Voltage").Create()
-            Domoticz.Device(Name="PVA", Unit=self.UNIT_PVA, Type=243, Subtype=23).Create()
-            Domoticz.Device(Name="PVW_250", Unit=self.UNIT_PVW_250, Type=248, Subtype=1).Create()
-            Domoticz.Device(Name="PVV_250", Unit=self.UNIT_PVV_250, TypeName="Voltage").Create()
-            Domoticz.Device(Name="PVA_250", Unit=self.UNIT_PVA_250, Type=243, Subtype=23).Create()            
+            if True == self.firstSolarCharger:
+                Domoticz.Device(Name="PVW", Unit=self.UNIT_PVW, Type=248, Subtype=1).Create()
+                Domoticz.Device(Name="PVV", Unit=self.UNIT_PVV, TypeName="Voltage").Create()
+                Domoticz.Device(Name="PVA", Unit=self.UNIT_PVA, Type=243, Subtype=23).Create()
+            if True == self.secondSolarCharger:
+                Domoticz.Device(Name="PVW_250", Unit=self.UNIT_PVW_250, Type=248, Subtype=1).Create()
+                Domoticz.Device(Name="PVV_250", Unit=self.UNIT_PVV_250, TypeName="Voltage").Create()
+                Domoticz.Device(Name="PVA_250", Unit=self.UNIT_PVA_250, Type=243, Subtype=23).Create()
             Domoticz.Device(Name="acInVL2", Unit=self.UNIT_ACINVL2, TypeName="Voltage").Create()
             Domoticz.Device(Name="acInAL2", Unit=self.UNIT_ACINAL2, Type=243, Subtype=23).Create()
             Domoticz.Device(Name="acInWL2", Unit=self.UNIT_ACINWL2, Type=248, Subtype=1).Create()
@@ -121,48 +136,48 @@ class BasePlugin:
             
             Domoticz.Log("Devices created.")
         else:
-            #self.acInVL1 = Devices[self.UNIT_ACINVL1].sValue 
-            if not self.UNIT_PVW in Devices:
-                Domoticz.Device(Name="PVW", Unit=self.UNIT_PVW, Type=248, Subtype=1).Create()
-            else:
-                self.solPVPower = Devices[self.UNIT_PVW].sValue
+            if True == self.firstSolarCharger:
+                if not self.UNIT_PVW in Devices:
+                    Domoticz.Device(Name="PVW", Unit=self.UNIT_PVW, Type=248, Subtype=1).Create()
+                else:
+                    self.solPVPower = Devices[self.UNIT_PVW].sValue
 
-            if not self.UNIT_PVALLPOW in Devices:
-                Domoticz.Device(Name="PVPower", Unit=self.UNIT_PVALLPOW, TypeName="kWh").Create()
-            else:
-                self.power = Devices[self.UNIT_PVALLPOW].sValue 
+                if not self.UNIT_PVALLPOW in Devices:
+                    Domoticz.Device(Name="PVPower", Unit=self.UNIT_PVALLPOW, TypeName="kWh").Create()
+                else:
+                    self.power = Devices[self.UNIT_PVALLPOW].sValue 
 
-            if not self.UNIT_PVV in Devices:
-                Domoticz.Device(Name="PVV", Unit=self.UNIT_PVV, TypeName="Voltage").Create()
-            else:
-                self.solPVV = Devices[self.UNIT_PVV].sValue
+                if not self.UNIT_PVV in Devices:
+                    Domoticz.Device(Name="PVV", Unit=self.UNIT_PVV, TypeName="Voltage").Create()
+                else:
+                    self.solPVV = Devices[self.UNIT_PVV].sValue
+                    
+                if not self.UNIT_PVA in Devices:
+                    Domoticz.Device(Name="PVA", Unit=self.UNIT_PVA, Type=243, Subtype=23).Create()
+                else:
+                    self.solPVA = Devices[self.UNIT_PVA].sValue
                 
-            if not self.UNIT_PVA in Devices:
-                Domoticz.Device(Name="PVA", Unit=self.UNIT_PVA, Type=243, Subtype=23).Create()
-            else:
-                self.solPVA = Devices[self.UNIT_PVA].sValue
-                
 
-            # 250V mppt                
-            if not self.UNIT_PVW_250 in Devices:
-                Domoticz.Device(Name="PVW_250", Unit=self.UNIT_PVW_250, Type=248, Subtype=1).Create()
-            else:
-                self.solPVPower_250 = Devices[self.UNIT_PVW_250].sValue
+            if True == self.secondSolarCharger:
+                if not self.UNIT_PVW_250 in Devices:
+                    Domoticz.Device(Name="PVW_250", Unit=self.UNIT_PVW_250, Type=248, Subtype=1).Create()
+                else:
+                    self.solPVPower_250 = Devices[self.UNIT_PVW_250].sValue
 
-            if not self.UNIT_PVALLPOW_250 in Devices:
-                Domoticz.Device(Name="PVPower_250", Unit=self.UNIT_PVALLPOW_250, TypeName="kWh").Create()
-            else:
-                self.power_250 = Devices[self.UNIT_PVALLPOW_250].sValue 
+                if not self.UNIT_PVALLPOW_250 in Devices:
+                    Domoticz.Device(Name="PVPower_250", Unit=self.UNIT_PVALLPOW_250, TypeName="kWh").Create()
+                else:
+                    self.power_250 = Devices[self.UNIT_PVALLPOW_250].sValue 
 
-            if not self.UNIT_PVV_250 in Devices:
-                Domoticz.Device(Name="PVV_250", Unit=self.UNIT_PVV_250, TypeName="Voltage").Create()
-            else:
-                self.solPVV_250 = Devices[self.UNIT_PVV_250].sValue
-                
-            if not self.UNIT_PVA_250 in Devices:
-                Domoticz.Device(Name="PVA_250", Unit=self.UNIT_PVA_250, Type=243, Subtype=23).Create()
-            else:
-                self.solPVA_250 = Devices[self.UNIT_PVA_250].sValue
+                if not self.UNIT_PVV_250 in Devices:
+                    Domoticz.Device(Name="PVV_250", Unit=self.UNIT_PVV_250, TypeName="Voltage").Create()
+                else:
+                    self.solPVV_250 = Devices[self.UNIT_PVV_250].sValue
+                    
+                if not self.UNIT_PVA_250 in Devices:
+                    Domoticz.Device(Name="PVA_250", Unit=self.UNIT_PVA_250, Type=243, Subtype=23).Create()
+                else:
+                    self.solPVA_250 = Devices[self.UNIT_PVA_250].sValue
                 
                 
             # L2  
@@ -511,42 +526,51 @@ class BasePlugin:
        
     def SyncDevices(self, TimedOut):
     
-        UpdateDevice(self.UNIT_ACINVL1, self.acInVL1, str(self.acInVL1), TimedOut)
-        UpdateDevice(self.UNIT_ACINAL1, self.acInAL1, str(self.acInAL1), TimedOut)
-        UpdateDevice(self.UNIT_ACINWL1, self.acInWL1, str(self.acInWL1), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTVL1, self.acOutVL1, str(self.acOutVL1), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTAL1, self.acOutAL1, str(self.acOutAL1), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTWL1, self.acOutWL1, str(self.acOutWL1), TimedOut)
-        UpdateDevice(self.UNIT_BATTV, self.battV, str(self.battV), TimedOut)
-        UpdateDevice(self.UNIT_BATTA, self.battA, str(self.battA), TimedOut)
-        UpdateDevice(self.UNIT_BATTSOC, self.battSOC, str(self.battSOC), TimedOut)
-        UpdateDevice(self.UNIT_BATTSTATE, self.battState, self.state(self.battState), TimedOut)
-        UpdateDevice(self.UNIT_BATTTEMP, self.battTemp, str(self.battTemp), TimedOut)
-        UpdateDevice(self.UNIT_BATTW, self.battW, str(self.battW), TimedOut)
-        UpdateDevice(self.UNIT_PVW, self.solPVPower, str(self.solPVPower), TimedOut)
-        UpdateDevice(self.UNIT_PVALLPOW, 0, str(self.power), TimedOut)
-        UpdateDevice(self.UNIT_PVV, 0, str(self.solPVV), TimedOut)
-        UpdateDevice(self.UNIT_PVA, 0, str(self.solPVA), TimedOut)
-     
-        UpdateDevice(self.UNIT_ACINVL2, self.acInVL2, str(self.acInVL2), TimedOut)
-        UpdateDevice(self.UNIT_ACINAL2, self.acInAL2, str(self.acInAL2), TimedOut)
-        UpdateDevice(self.UNIT_ACINWL2, self.acInWL2, str(self.acInWL2), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTVL2, self.acOutVL2, str(self.acOutVL2), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTAL2, self.acOutAL2, str(self.acOutAL2), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTWL2, self.acOutWL2, str(self.acOutWL2), TimedOut)
-        
-        UpdateDevice(self.UNIT_ACINVL3, self.acInVL3, str(self.acInVL3), TimedOut)
-        UpdateDevice(self.UNIT_ACINAL3, self.acInAL3, str(self.acInAL3), TimedOut)
-        UpdateDevice(self.UNIT_ACINWL3, self.acInWL3, str(self.acInWL3), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTVL3, self.acOutVL3, str(self.acOutVL3), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTAL3, self.acOutAL3, str(self.acOutAL3), TimedOut)
-        UpdateDevice(self.UNIT_ACOUTWL3, self.acOutWL3, str(self.acOutWL3), TimedOut)        
-        
-        UpdateDevice(self.UNIT_PVW_250, self.solPVPower_250, str(self.solPVPower_250), TimedOut)
-        UpdateDevice(self.UNIT_PVALLPOW_250, 0, str(self.power_250), TimedOut)
-        UpdateDevice(self.UNIT_PVV_250, 0, str(self.solPVV_250), TimedOut)
-        UpdateDevice(self.UNIT_PVA_250, 0, str(self.solPVA_250), TimedOut)   
-        
+        try:
+            UpdateDevice(self.UNIT_ACINVL1, self.acInVL1, str(self.acInVL1), TimedOut)
+            UpdateDevice(self.UNIT_ACINAL1, self.acInAL1, str(self.acInAL1), TimedOut)
+            UpdateDevice(self.UNIT_ACINWL1, self.acInWL1, str(self.acInWL1), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTVL1, self.acOutVL1, str(self.acOutVL1), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTAL1, self.acOutAL1, str(self.acOutAL1), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTWL1, self.acOutWL1, str(self.acOutWL1), TimedOut)
+            UpdateDevice(self.UNIT_BATTV, self.battV, str(self.battV), TimedOut)
+            UpdateDevice(self.UNIT_BATTA, self.battA, str(self.battA), TimedOut)
+            UpdateDevice(self.UNIT_BATTSOC, self.battSOC, str(self.battSOC), TimedOut)
+            UpdateDevice(self.UNIT_BATTSTATE, self.battState, self.state(self.battState), TimedOut)
+            UpdateDevice(self.UNIT_BATTTEMP, self.battTemp, str(self.battTemp), TimedOut)
+            UpdateDevice(self.UNIT_BATTW, self.battW, str(self.battW), TimedOut)
+            
+            if True == self.firstSolarCharger:
+                UpdateDevice(self.UNIT_PVW, self.solPVPower, str(self.solPVPower), TimedOut)
+                UpdateDevice(self.UNIT_PVALLPOW, 0, str(self.power), TimedOut) # 0 - it isn't a int
+                UpdateDevice(self.UNIT_PVV, 0, str(self.solPVV), TimedOut)
+                UpdateDevice(self.UNIT_PVA, 0, str(self.solPVA), TimedOut)
+         
+            UpdateDevice(self.UNIT_ACINVL2, self.acInVL2, str(self.acInVL2), TimedOut)
+            UpdateDevice(self.UNIT_ACINAL2, self.acInAL2, str(self.acInAL2), TimedOut)
+            UpdateDevice(self.UNIT_ACINWL2, self.acInWL2, str(self.acInWL2), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTVL2, self.acOutVL2, str(self.acOutVL2), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTAL2, self.acOutAL2, str(self.acOutAL2), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTWL2, self.acOutWL2, str(self.acOutWL2), TimedOut)
+            
+            UpdateDevice(self.UNIT_ACINVL3, self.acInVL3, str(self.acInVL3), TimedOut)
+            UpdateDevice(self.UNIT_ACINAL3, self.acInAL3, str(self.acInAL3), TimedOut)
+            UpdateDevice(self.UNIT_ACINWL3, self.acInWL3, str(self.acInWL3), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTVL3, self.acOutVL3, str(self.acOutVL3), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTAL3, self.acOutAL3, str(self.acOutAL3), TimedOut)
+            UpdateDevice(self.UNIT_ACOUTWL3, self.acOutWL3, str(self.acOutWL3), TimedOut)        
+
+            if True == self.secondSolarCharger:            
+                if ( 0 != int(self.solPVPower_250 )):
+                    UpdateDevice(self.UNIT_PVW_250, self.solPVPower_250, str(self.solPVPower_250), TimedOut)
+                #self.power_2505.8;1975000.0
+                if ( 0 != int(float(self.power_250.split(";")[1])//1 )):
+                    UpdateDevice(self.UNIT_PVALLPOW_250, 0, str(self.power_250), TimedOut)
+                UpdateDevice(self.UNIT_PVV_250, self.solPVV_250, str(self.solPVV_250), TimedOut)
+                UpdateDevice(self.UNIT_PVA_250, self.solPVA_250, str(self.solPVA_250), TimedOut)   
+        except Exception as e:
+            Domoticz.Log("except: " + str(e))
+            
         return
 
 #    def onCommand(self, Unit, Command, Level, Hue):
